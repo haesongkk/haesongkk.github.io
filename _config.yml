@@ -18,9 +18,9 @@ collections:
     output: true
     permalink: /:collection/:path/
 
-# defaults:
-#   - scope: { type: "study" }
-#     values: { layout: item }
+defaults:
+  - scope: { type: "study" }
+    values: { layout: default }
 #   - scope: { type: "project" }
 #     values: { layout: item }  
 #   - scope: { type: "codingtest" }
