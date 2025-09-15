@@ -19,25 +19,30 @@
 <div class="layout">
   <aside class="nav">
     {% for coll in site.collections %}
-  {% unless coll.label == "posts" or coll.label == "drafts" %}
-    <h3>{{ coll.label | capitalize }}</h3>
-    <ul>
-      {% assign docs = coll.docs | sort: "path" %}
-      {% assign current_section = "" %}
-      {% for d in docs %}
-        {% assign rel = d.path | remove_first: "_" | remove_first: coll.label | prepend: "" %}
-        {% assign section = rel | split: "/" | first %}
-        {% if section != current_section %}
-          {% if current_section != "" %}</ul><ul>{% endif %}
-          <li><strong>{{ section }}</strong></li>
-          {% assign current_section = section %}
-        {% endif %}
-        <li><a href="{{ d.url | relative_url }}">{{ d.title }}</a></li>
-      {% endfor %}
-    </ul>
-  {% endunless %}
-{% endfor %}
+      {% unless coll.label == "posts" or coll.label == "drafts" %}
+        <h3>{{ coll.label | capitalize }}</h3>
+        <ul>
+          {% assign docs = coll.docs | sort: "path" %}
+          {% assign current_section = "" %}
+          {% for d in docs %}
+            {% assign rel = d.path | remove_first: "_" | remove_first: coll.label | prepend: "" %}
+            {% assign section = rel | split: "/" | first %}
+            {% if section != current_section %}
+              {% if current_section != "" %}</ul><ul>{% endif %}
+              <li><strong>{{ section }}</strong></li>
+              {% assign current_section = section %}
+            {% endif %}
+            <li>
+              <a href="{{ d.url | relative_url }}">
+                {{ d.title | default: d.name | split: "." | first }}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endunless %}
+    {% endfor %}
   </aside>
+</div>
 
   <main class="content">
     {{ content }}
