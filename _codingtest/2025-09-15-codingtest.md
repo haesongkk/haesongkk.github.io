@@ -1,6 +1,6 @@
 ---
-layout: default
-title: "Hello Jekyll"
+layout: post
+title: "더하기 함수"
 date: 2025-09-15 12:00:00 +0900
 ---
  

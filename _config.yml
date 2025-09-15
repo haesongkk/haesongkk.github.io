@@ -7,6 +7,26 @@ markdown: kramdown
 
 theme: minima
 
+collections:
+  study:
+    output: true
+    permalink: /:collection/:path/
+  project:
+    output: true
+    permalink: /:collection/:path/
+  codingtest:
+    output: true
+    permalink: /:collection/:path/
+
+defaults:
+  - scope: { type: "study" }
+    values: { layout: item }
+  - scope: { type: "project" }
+    values: { layout: item }  
+  - scope: { type: "codingtest" }
+    values: { layout: item }
+
+
 plugins:
   - jekyll-paginate
 
