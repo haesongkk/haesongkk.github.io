@@ -4,12 +4,11 @@ baseurl: ""
 timezone: "Asia/Seoul"
 
 markdown: kramdown
-highlighter: rouge
 
 theme: minima
 
 plugins:
   - jekyll-paginate
-  
+
 paginate: 10
 paginate_path: "/page:num"
