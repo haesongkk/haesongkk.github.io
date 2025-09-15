@@ -19,7 +19,7 @@ collections:
     permalink: /:collection/:path/
 
 defaults:
-  - scope: { type: "study" }
+  - scope: { type: "codingtest" }
     values: { layout: default }
 #   - scope: { type: "project" }
 #     values: { layout: item }  
