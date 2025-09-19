@@ -4,50 +4,272 @@
   <meta charset="utf-8">
   <title>{{ page.title }} - {{ site.title }}</title>
   <style>
-    body { margin: 0; font-family: sans-serif; }
-    .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
-    aside.nav { background: #f9f9f9; border-right: 1px solid #ddd; padding: 16px; }
-    aside.nav h3 { margin-top: 0; font-size: 14px; color: #555; }
-    aside.nav ul { list-style: none; padding: 0; margin: 0 0 16px; }
-    aside.nav li { margin: 6px 0; }
-    aside.nav a { text-decoration: none; color: #333; display: block; padding: 4px 6px; border-radius: 4px; }
-    aside.nav a.active, aside.nav a:hover { background: #e9eefc; }
+    :root {
+      --border: #e5e7eb;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --hover: #eef2ff;
+      --active: #e9eefc;
+      --accent: #3b82f6;
+    }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); }
+    .layout { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+    aside.nav { background: #fafafa; border-right: 1px solid var(--border); padding: 16px; overflow: auto; }
+    aside.nav h3 { margin: 4px 0 12px; font-size: 13px; color: var(--muted); letter-spacing: .02em; text-transform: uppercase; }
     main.content { padding: 24px; }
+
+    /* 트리 스타일 */
+    .tree { margin: 0; padding: 0; list-style: none; }
+    .tree a {
+      display: block;
+      padding: 6px 8px;
+      border-radius: 6px;
+      text-decoration: none;
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.3;
+    }
+    .tree a:hover { background: var(--hover); }
+    .tree a.active { background: var(--active); border-left: 3px solid var(--accent); padding-left: 5px; }
+
+    details.folder {
+      margin: 2px 0;
+      padding-left: 4px;
+    }
+    details.folder > summary {
+      list-style: none; /* 기본 삼각형 제거 (브라우저별 기본 스타일 숨김) */
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+      font-size: 14px;
+      color: #374151;
+      padding: 6px 6px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    details.folder > summary:hover { background: var(--hover); }
+    /* 커스텀 카렛 */
+    .caret {
+      width: 0;
+      height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 6px solid #6b7280;
+      transition: transform .15s ease;
+      margin-right: 2px;
+    }
+    details[open] > summary .caret { transform: rotate(90deg); }
+
+    /* 중첩 컨텐츠 들여쓰기 */
+    .children { margin: 4px 0 4px 16px; padding-left: 8px; border-left: 1px dashed #e5e7eb; }
+    .root-badge {
+      display:inline-block; font-size:12px; color:#6b7280; background:#f3f4f6; padding:2px 6px; border-radius:999px; margin-left:6px;
+    }
+
+    /* 상단 검색 (선택적) */
+    .search { display: flex; gap: 6px; margin-bottom: 12px; }
+    .search input {
+      width: 100%; padding: 8px 10px; border:1px solid var(--border); border-radius: 8px; font-size: 14px;
+      outline: none;
+    }
+    .search input:focus { border-color: #c7d2fe; box-shadow: 0 0 0 3px #eef2ff; }
   </style>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/tokyo-night-dark.css">
 </head>
 <body>
 <div class="layout">
   <aside class="nav">
-    {% for coll in site.collections %}
-      {% unless coll.label == "posts" or coll.label == "drafts" %}
-        <h3>{{ coll.label | capitalize }}</h3>
-        <ul>
-          {% assign docs = coll.docs | sort: "path" %}
-          {% assign current_section = "" %}
-          {% for d in docs %}
-            {% assign rel = d.path | remove_first: "_" | remove_first: coll.label | prepend: "" %}
-            {% assign section = rel | split: "/" | first %}
-            {% if section != current_section %}
-              {% if current_section != "" %}</ul><ul>{% endif %}
-              <li><strong>{{ section }}</strong></li>
-              {% assign current_section = section %}
-            {% endif %}
-            <li>
-              <a href="{{ d.url | relative_url }}">
-                {{ d.title | default: d.name | split: "." | first }}
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
-      {% endunless %}
-    {% endfor %}
+    <h3>POST 폴더 트리</h3>
+    <div class="search">
+      <input id="filter" type="search" placeholder="문서/폴더 검색…" aria-label="검색">
+    </div>
+    <nav id="tree" class="tree" aria-label="Folder tree"></nav>
   </aside>
+
   <main class="content">
     {{ content }}
   </main>
 </div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
+
+<script>
+  // 1) Liquid로 페이지 메타 주입 (POST 폴더만 트리로 쓸 거지만, pathParts가 필요)
+  const PAGES = [
+    {% for d in site.pages %}
+      {% if d.url and d.path and d.name and d.name != '404.html' %}
+        {
+          "title": {{ d.title | default: d.name | split: "." | first | jsonify }},
+          "url": "{{ d.url | relative_url }}",
+          "pathParts": {{ d.path | split: "/" | jsonify }}
+        }{% unless forloop.last %},{% endunless %}
+      {% endif %}
+    {% endfor %}
+  ];
+
+  const isFile = seg => /\.[A-Za-z0-9]+$/.test(seg);
+
+  // 2) POST 폴더만 수집하여 트리 구축
+  function buildTree(pages) {
+    const tree = {};
+    for (const pg of pages) {
+      const parts = (pg.pathParts || []).slice();
+      if (!(parts.length > 0 && parts[0] === "POST")) continue;
+
+      if (parts.length && isFile(parts[parts.length - 1])) parts.pop();
+
+      // POST 루트 바로 아래 파일
+      if (parts.length <= 1) {
+        const node = (tree._root ||= {});
+        (node._docs ||= []).push({ title: pg.title, url: pg.url });
+        continue;
+      }
+
+      // POST/… 이하
+      let node = tree;
+      for (const seg of parts.slice(1)) {
+        node = (node[seg] ||= {});
+      }
+      (node._docs ||= []).push({ title: pg.title, url: pg.url });
+    }
+    return tree;
+  }
+
+  // 3) 렌더 유틸
+  const $ = sel => document.querySelector(sel);
+  function el(tag, attrs = {}, children = []) {
+    const n = document.createElement(tag);
+    for (const [k,v] of Object.entries(attrs)) {
+      if (k === 'class') n.className = v;
+      else if (k === 'text') n.textContent = v;
+      else if (k === 'html') n.innerHTML = v;
+      else n.setAttribute(k, v);
+    }
+    for (const c of [].concat(children)) if (c) n.appendChild(c);
+    return n;
+  }
+  function link(text, href, isActive = false) {
+    const a = el('a', { href }, [document.createTextNode(text)]);
+    if (isActive) a.classList.add('active');
+    return a;
+  }
+
+  // 4) details/summary로 접이식 폴더 렌더
+  function renderFolder(name, node, currentPathname) {
+    const caret = el('span', { class: 'caret', ariaHidden: 'true' });
+    const summary = el('summary', {}, [caret, document.createTextNode(name)]);
+    const details = el('details', { class: 'folder' }, [summary]);
+    const container = el('div', { class: 'children' });
+    details.appendChild(container);
+
+    // 하위 폴더들
+    const keys = Object.keys(node).filter(k => k !== '_docs').sort();
+    for (const k of keys) {
+      container.appendChild(renderFolder(k, node[k], currentPathname));
+    }
+
+    // 현재 폴더의 문서들
+    if (node._docs) {
+      const docs = node._docs.slice().sort((a,b)=>a.title.localeCompare(b.title));
+      for (const d of docs) {
+        const isActive = normalize(d.url) === normalize(currentPathname);
+        container.appendChild(el('div', {}, [ link(d.title, d.url, isActive) ]));
+        // 현재 링크가 활성화면 폴더를 펼침
+        if (isActive) details.setAttribute('open','');
+      }
+    }
+    return details;
+  }
+
+  function normalize(url) {
+    try {
+      // 상대경로도 처리
+      const a = document.createElement('a');
+      a.href = url;
+      return a.pathname.replace(/\/index\.html?$/,'/'); // /path/index.html → /path/
+    } catch { return url; }
+  }
+
+  // 5) 렌더 실행
+  const treeData = buildTree(PAGES);
+  const mount = document.getElementById('tree');
+  const currentPathname = normalize(location.pathname);
+
+  // POST 루트 직속 문서 묶음
+  if (treeData._root) {
+    const badge = el('span', { class: 'root-badge', text: 'POST 루트' });
+    const rootBox = el('div', {}, [ badge ]);
+    const rootChildren = el('div', { class: 'children' });
+
+    const docs = treeData._root._docs.slice().sort((a,b)=>a.title.localeCompare(b.title));
+    for (const d of docs) {
+      const isActive = normalize(d.url) === currentPathname;
+      rootChildren.appendChild(el('div', {}, [ link(d.title, d.url, isActive) ]));
+    }
+    rootBox.appendChild(rootChildren);
+    mount.appendChild(rootBox);
+  }
+
+  // 최상위 폴더들
+  const topKeys = Object.keys(treeData).filter(k => k !== '_root').sort();
+  for (const k of topKeys) {
+    mount.appendChild(renderFolder(k, treeData[k], currentPathname));
+  }
+
+  // 6) 검색(폴더/문서 텍스트 포함) – 간단한 필터
+  const $filter = document.getElementById('filter');
+  $filter.addEventListener('input', () => {
+    const q = $filter.value.trim().toLowerCase();
+    // 모든 노드 초기화
+    mount.querySelectorAll('.folder').forEach(d => d.style.display = '');
+    mount.querySelectorAll('a').forEach(a => a.parentElement.style.display = '');
+
+    if (!q) return;
+
+    // 폴더 요약/문서 텍스트 기준으로 필터
+    mount.querySelectorAll('.folder').forEach(d => {
+      const name = d.querySelector('summary')?.innerText?.toLowerCase() || '';
+      const matchesFolder = name.includes(q);
+
+      // 하위에 매치되는 무언가가 있는지 검사
+      let hasMatchBelow = false;
+
+      // 자식 문서
+      d.querySelectorAll('.children a').forEach(a => {
+        const ok = a.textContent.toLowerCase().includes(q);
+        a.parentElement.style.display = ok ? '' : 'none';
+        if (ok) hasMatchBelow = true;
+      });
+
+      // 자식 폴더들
+      d.querySelectorAll(':scope > .children > details.folder').forEach(sub => {
+        const visible = sub.style.display !== 'none';
+        if (visible) hasMatchBelow = true;
+      });
+
+      // 자신이 매치되거나 하위가 매치되면 보이기
+      d.style.display = (matchesFolder || hasMatchBelow) ? '' : 'none';
+
+      // 매치가 있으면 펼치기
+      if (matchesFolder || hasMatchBelow) d.setAttribute('open','');
+    });
+
+    // 루트 문서들 필터
+    const rootDocs = mount.querySelectorAll('.root-badge')?.[0]?.parentElement?.querySelectorAll('.children a') || [];
+    let anyRootDoc = false;
+    rootDocs.forEach(a => {
+      const ok = a.textContent.toLowerCase().includes(q);
+      a.parentElement.style.display = ok ? '' : 'none';
+      if (ok) anyRootDoc = true;
+    });
+    if (rootDocs.length) {
+      const box = mount.querySelector('.root-badge')?.parentElement;
+      if (box) box.style.display = anyRootDoc ? '' : 'none';
+    }
+  });
+</script>
 </body>
 </html>
